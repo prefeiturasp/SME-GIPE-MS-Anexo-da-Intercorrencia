@@ -1,0 +1,16 @@
+# Dependências extras para desenvolvimento
+
+-r base.txt
+
+# Debug
+ipython==8.18.1
+
+# Testes
+coverage==7.10.6
+django_coverage_plugin==3.1.1
+pytest==8.4.2
+pytest-django==4.11.1
+pytest-sugar==1.1.1
+factory_boy==3.3.3
+pytest-factoryboy==2.8.1
+Faker==37.8.0

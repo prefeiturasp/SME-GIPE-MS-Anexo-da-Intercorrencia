@@ -1,4 +1,4 @@
-# Backend - Django + Django Rest Framework. SME GIPE MS Anexo Intercorrencia
+# Backend - Django + Django Rest Framework + MinIO. SME GIPE MS Anexo Intercorrencia
 
 ## 🥞 Stack
 - [Python v3.12](https://www.python.org/doc/)
@@ -80,7 +80,42 @@ Primeiro, clone o projeto:
 Feito tudo isso, o projeto estará executando no endereço [localhost:8000/api-anexos/v1/](http://localhost:8000/api-anexos/v1/).
 
 ### 👑 Opcional: Criando um super usuário
-    $ python manage.py createsuperuser
+    $ python manage.py createsuperuser    
+
+
+## 📤 Configuração MiniIO
+
+### Variáveis de Ambiente (.env)
+
+```env
+# MinIO
+MINIO_ENDPOINT=localhost:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_USE_HTTPS=False
+MINIO_BUCKET_NAME=anexos-intercorrencias
+MINIO_EXTERNAL_ENDPOINT=http://localhost:9000  # Opcional
+MINIO_STORAGE_PRESIGNED_URL_TTL=1 
+```
+
+### Parâmetros
+
+- **MINIO_ENDPOINT**: Endereço do servidor MinIO (host:porta)
+- **MINIO_ACCESS_KEY**: Chave de acesso
+- **MINIO_SECRET_KEY**: Chave secreta
+- **MINIO_USE_HTTPS**: Se deve usar HTTPS (True/False)
+- **MINIO_BUCKET_NAME**: Nome do bucket onde os arquivos serão armazenados
+- **MINIO_EXTERNAL_ENDPOINT**: URL externa para acesso aos arquivos (opcional)    
+- **MINIO_STORAGE_PRESIGNED_URL_TTL**: tempo em minutos da duração da url pré assinada para download  
+
+### Subir MinIO
+    $ docker compose up
+
+## 🔍 Acessar Console do MinIO
+
+- **URL**: http://localhost:9001
+- **Usuário**: minioadmin
+- **Senha**: minioadmin    
 
 ### 🧪 Executando os testes com Pytest
     $ pytest

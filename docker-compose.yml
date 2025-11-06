@@ -1,38 +1,30 @@
-version: "3.9"
+version: '3.8'
 
 services:
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: django_app_ms_anexo_intercorrencias
-    restart: always
-    command: >
-      sh -c "
-        python manage.py collectstatic --noinput &&
-        python manage.py migrate &&
-        gunicorn config.wsgi:application --bind 0.0.0.0:8000
-      "
-    env_file:
-      - .env
-    volumes:
-      - static_volume:/app/static
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
 
-  db:
-    image: postgres:16.4
-    container_name: postgres_db_ms_anexo_intercorrencias
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
+  minio:
+    image: minio/minio:latest
+    container_name: anexos_minio
+    command: server /data --console-address ":9001"
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    restart: always
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console Web
+    volumes:
+      - minio_data:/data
+    networks:
+      - anexos_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
 volumes:
-  postgres_data:
-  static_volume:
+  minio_data:
+
+networks:
+  anexos_network:
+    driver: bridge

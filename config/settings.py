@@ -20,6 +20,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 # Sempre ler o .env em desenvolvimento
 env.read_env(str(BASE_DIR / ".env"))
+READ_DOT_ENV_FILE = env.bool("DJANGO_READ_DOT_ENV_FILE", default=False)
+if READ_DOT_ENV_FILE:
+    # OS environment variables take precedence over variables from .env
+    env.read_env(str(BASE_DIR / ".env"))
 
 
 # Quick-start development settings - unsuitable for production
@@ -197,6 +201,7 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Micro serviço responsável pela gestão dos anexos das Intercorrências Escolares",
     "VERSION": "1.0.0",
     "SWAGGER_UI_SETTINGS": {"persistAuthorization": True},
+    "SERVE_INCLUDE_SCHEMA": False,
     # (opcional, mas útil para aplicar o Bearer globalmente no spec)
     "SECURITY": [{"Bearer": []}],
 }

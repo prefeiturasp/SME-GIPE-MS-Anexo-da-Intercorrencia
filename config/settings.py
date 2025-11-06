@@ -49,16 +49,14 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'drf_spectacular',
-    'django_minio_backend',  # Para integração com MinIO
     # Local apps
     'anexos.apps.AnexosConfig',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    "corsheaders.middleware.CorsMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -141,15 +139,58 @@ STATIC_URL = "/django_static/"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# ===========================
+# CONFIGURAÇÃO DO MINIO
+# ===========================
+
+# Configurações do MinIO
+MINIO_ENDPOINT = env('MINIO_ENDPOINT', default='localhost:9000')
+MINIO_ACCESS_KEY = env('MINIO_ACCESS_KEY', default='minioadmin')
+MINIO_SECRET_KEY = env('MINIO_SECRET_KEY', default='minioadmin')
+MINIO_USE_HTTPS = env.bool('MINIO_USE_HTTPS', default=False)
+MINIO_BUCKET_NAME = env('MINIO_BUCKET_NAME', default='anexos-intercorrencias')
+MINIO_EXTERNAL_ENDPOINT = env('MINIO_EXTERNAL_ENDPOINT', default=None)
+MINIO_STORAGE_PRESIGNED_URL_TTL = env('MINIO_STORAGE_PRESIGNED_URL_TTL', default=1)
+
+# URL base para acesso aos arquivos
+if MINIO_EXTERNAL_ENDPOINT:
+    MINIO_STORAGE_MEDIA_BASE_URL = MINIO_EXTERNAL_ENDPOINT
+else:
+    protocol = 'https' if MINIO_USE_HTTPS else 'http'
+    MINIO_STORAGE_MEDIA_BASE_URL = f'{protocol}://{MINIO_ENDPOINT}'
+
+# Configuração do Storage no formato Django 5.2+
+STORAGES = {
+    "default": {
+        "BACKEND": "anexos.storage.MinioStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+# ===========================
+# REST FRAMEWORK
+# ===========================
+
 # DRF + JWT (SimpleJWT já instalado, pode ativar quando integrar)
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        'anexos.auth.RemoteJWTAuthentication',  # Autenticação JWT customizada
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.MultiPartParser',
+        'rest_framework.parsers.FormParser',
+    ],
+    'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S',
+    'DATE_FORMAT': '%Y-%m-%d',
 }
 
 # OpenAPI / Swagger
@@ -157,8 +198,10 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "API - Anexo das Intercorrências Escolares",
     "DESCRIPTION": "Micro serviço responsável pela gestão dos anexos das Intercorrências Escolares",
     "VERSION": "1.0.0",
-    "SERVERS": [{"url": "http://localhost:8000", "description": "Local"}],
+    "SWAGGER_UI_SETTINGS": {"persistAuthorization": True},
     "SERVE_INCLUDE_SCHEMA": False,
+    # (opcional, mas útil para aplicar o Bearer globalmente no spec)
+    "SECURITY": [{"Bearer": []}],
 }
 
 # CORS

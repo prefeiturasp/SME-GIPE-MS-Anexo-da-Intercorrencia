@@ -19,8 +19,11 @@ class TestSettingsMinioExternalEndpoint:
             'MINIO_ACCESS_KEY': 'test_key',
             'MINIO_SECRET_KEY': 'test_secret',
             'MINIO_BUCKET_NAME': 'test_bucket',
-            'SECRET_KEY': 'test_secret_key',
-            'DATABASE_URL': 'sqlite:///test.db',
+            'DJANGO_SECRET_KEY': 'test_secret_key',
+            'POSTGRES_DB': 'test_db',
+            'POSTGRES_USER': 'test_user',
+            'POSTGRES_PASSWORD': 'test_password',
+            'POSTGRES_PORT': '5432',
         }):
             # Remover módulo do cache se existir
             if 'config.settings' in sys.modules:
@@ -40,8 +43,11 @@ class TestSettingsMinioExternalEndpoint:
             'MINIO_ACCESS_KEY': 'test_key',
             'MINIO_SECRET_KEY': 'test_secret',
             'MINIO_BUCKET_NAME': 'test_bucket',
-            'SECRET_KEY': 'test_secret_key',
-            'DATABASE_URL': 'sqlite:///test.db',
+            'DJANGO_SECRET_KEY': 'test_secret_key',
+            'POSTGRES_DB': 'test_db',
+            'POSTGRES_USER': 'test_user',
+            'POSTGRES_PASSWORD': 'test_password',
+            'POSTGRES_PORT': '5432',
         }
         
         with patch.dict(os.environ, env_vars, clear=True):

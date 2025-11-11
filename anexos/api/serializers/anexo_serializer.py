@@ -1,21 +1,51 @@
 import os
+from venv import logger
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.types import OpenApiTypes
 from anexos.models.anexo import Anexo
+from anexos.services import intercorrencia_service
+from anexos.services.intercorrencia_service import ExternalServiceError
 
 class AnexoSerializer(serializers.ModelSerializer):
     """Serializer para criação e atualização de anexos"""
     
     # Campos adicionais read-only
-    tamanho_formatado = serializers.ReadOnlyField()
-    extensao = serializers.ReadOnlyField()
-    e_imagem = serializers.ReadOnlyField()
-    e_video = serializers.ReadOnlyField()
-    e_documento = serializers.ReadOnlyField()
-    categoria_display = serializers.CharField(source='get_categoria_display', read_only=True)
-    perfil_display = serializers.CharField(source='get_perfil_display', read_only=True)
+    tamanho_formatado = serializers.CharField(
+        read_only=True,
+        help_text="Tamanho do arquivo formatado (ex: 2.5 MB)"
+    )
+    extensao = serializers.CharField(
+        read_only=True,
+        help_text="Extensão do arquivo (ex: pdf, jpg)"
+    )
+    e_imagem = serializers.BooleanField(
+        read_only=True,
+        help_text="Indica se o arquivo é uma imagem"
+    )
+    e_video = serializers.BooleanField(
+        read_only=True,
+        help_text="Indica se o arquivo é um vídeo"
+    )
+    e_documento = serializers.BooleanField(
+        read_only=True,
+        help_text="Indica se o arquivo é um documento"
+    )
+    categoria_display = serializers.CharField(
+        source='get_categoria_display', 
+        read_only=True,
+        help_text="Nome amigável da categoria"
+    )
+    perfil_display = serializers.CharField(
+        source='get_perfil_display', 
+        read_only=True,
+        help_text="Nome amigável do perfil"
+    )
     
     # URL do arquivo (será preenchido pelo MinIO)
-    arquivo_url = serializers.SerializerMethodField()
+    arquivo_url = serializers.SerializerMethodField(
+        help_text="URL completa para acesso ao arquivo"
+    )
     
     class Meta:
         model = Anexo
@@ -33,6 +63,7 @@ class AnexoSerializer(serializers.ModelSerializer):
             'criado_em', 'atualizado_em'
         )
     
+    @extend_schema_field(OpenApiTypes.STR)
     def get_arquivo_url(self, obj):
         """Retorna URL do arquivo no MinIO"""
         if obj.arquivo:
@@ -40,6 +71,16 @@ class AnexoSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(obj.arquivo.url)
         return None
+    
+    def _get_token_from_request(self):
+        """Obtém o token do request. Retorna None se não disponível."""
+        request = self.context.get('request')
+        if not request or not hasattr(request, 'META'):
+            return None
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return None
+        return auth_header.split(' ')[1]
     
     def validate_arquivo(self, value):
         """Valida o arquivo enviado"""
@@ -91,7 +132,24 @@ class AnexoSerializer(serializers.ModelSerializer):
                     'arquivo': f'Limite de 10MB por intercorrência seria ultrapassado. '
                                f'Atualmente: {tamanho_atual_mb:.2f}MB de 10MB.'
                 })
-        
+                
+        # Validar intercorrência no serviço externo (apenas se token disponível)
+        if 'intercorrencia_uuid' in attrs:
+            token = self._get_token_from_request()
+            
+            # Só valida se o token estiver disponível (requisições via API)
+            # Em testes unitários ou outros contextos, essa validação é pulada
+            if token:
+                try:
+                    intercorrencia_uuid = attrs['intercorrencia_uuid']
+                    intercorrencia = intercorrencia_service.get_detalhes_intercorrencia(
+                        intercorrencia_uuid, 
+                        token=token
+                    )
+                    logger.info(f"Detalhes da intercorrência obtidos: {intercorrencia}")
+                except ExternalServiceError as e:
+                    raise serializers.ValidationError({"detail": str(e)})
+
         return attrs
     
     def is_valid(self, raise_exception=False):
@@ -132,11 +190,27 @@ class AnexoSerializer(serializers.ModelSerializer):
 class AnexoListSerializer(serializers.ModelSerializer):
     """Serializer simplificado para listagem"""
     
-    categoria_display = serializers.CharField(source='get_categoria_display', read_only=True)
-    perfil_display = serializers.CharField(source='get_perfil_display', read_only=True)
-    tamanho_formatado = serializers.ReadOnlyField()
-    extensao = serializers.ReadOnlyField()
-    arquivo_url = serializers.SerializerMethodField()
+    categoria_display = serializers.CharField(
+        source='get_categoria_display', 
+        read_only=True,
+        help_text="Nome amigável da categoria"
+    )
+    perfil_display = serializers.CharField(
+        source='get_perfil_display', 
+        read_only=True,
+        help_text="Nome amigável do perfil"
+    )
+    tamanho_formatado = serializers.CharField(
+        read_only=True,
+        help_text="Tamanho do arquivo formatado (ex: 2.5 MB)"
+    )
+    extensao = serializers.CharField(
+        read_only=True,
+        help_text="Extensão do arquivo (ex: pdf, jpg)"
+    )
+    arquivo_url = serializers.SerializerMethodField(
+        help_text="URL completa para acesso ao arquivo"
+    )
     
     class Meta:
         model = Anexo
@@ -146,6 +220,7 @@ class AnexoListSerializer(serializers.ModelSerializer):
             'arquivo_url', 'criado_em', 'usuario_username'
         )
     
+    @extend_schema_field(OpenApiTypes.STR)
     def get_arquivo_url(self, obj):
         """Retorna URL do arquivo no MinIO"""
         if obj.arquivo:

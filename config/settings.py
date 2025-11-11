@@ -35,6 +35,8 @@ DEBUG = env.bool("DEBUG", default=False)
 
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["*"])
 
+CSRF_TRUSTED_ORIGINS = env.str('CSRF_TRUSTED_ORIGINS', default='https://*.sme.prefeitura.sp.gov.br').split(',')
+
 
 # Application definition
 

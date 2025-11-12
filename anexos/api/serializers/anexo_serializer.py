@@ -133,22 +133,22 @@ class AnexoSerializer(serializers.ModelSerializer):
                                f'Atualmente: {tamanho_atual_mb:.2f}MB de 10MB.'
                 })
                 
-        # # Validar intercorrência no serviço externo (apenas se token disponível)
-        # if 'intercorrencia_uuid' in attrs:
-        #     token = self._get_token_from_request()
+        # Validar intercorrência no serviço externo (apenas se token disponível)
+        if 'intercorrencia_uuid' in attrs:
+            token = self._get_token_from_request()
             
-        #     # Só valida se o token estiver disponível (requisições via API)
-        #     # Em testes unitários ou outros contextos, essa validação é pulada
-        #     if token:
-        #         try:
-        #             intercorrencia_uuid = attrs['intercorrencia_uuid']
-        #             intercorrencia = intercorrencia_service.get_detalhes_intercorrencia(
-        #                 intercorrencia_uuid, 
-        #                 token=token
-        #             )
-        #             logger.info(f"Detalhes da intercorrência obtidos: {intercorrencia}")
-        #         except ExternalServiceError as e:
-        #             raise serializers.ValidationError({"detail": str(e)})
+            # Só valida se o token estiver disponível (requisições via API)
+            # Em testes unitários ou outros contextos, essa validação é pulada
+            if token:
+                try:
+                    intercorrencia_uuid = attrs['intercorrencia_uuid']
+                    intercorrencia = intercorrencia_service.get_detalhes_intercorrencia(
+                        intercorrencia_uuid, 
+                        token=token
+                    )
+                    logger.info(f"Detalhes da intercorrência obtidos: {intercorrencia}")
+                except ExternalServiceError as e:
+                    raise serializers.ValidationError({"detail": str(e)})
 
         return attrs
     

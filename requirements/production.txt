@@ -1,0 +1,6 @@
+# Dependências extras para produção
+
+-r base.txt
+
+# WSGI server
+gunicorn==23.0.0

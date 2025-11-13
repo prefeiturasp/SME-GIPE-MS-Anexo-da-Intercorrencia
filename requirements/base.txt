@@ -1,0 +1,35 @@
+# Dependências comuns a todos os ambientes
+
+# Django core
+Django==5.2.6
+djangorestframework==3.16.1
+djangorestframework_simplejwt==5.5.1
+django-environ==0.12.0
+
+# Postgres
+psycopg2-binary==2.9.11
+
+# MinIO
+django-minio-backend==4.1.0
+minio==7.2.18
+
+# CORS
+django-cors-headers==4.9.0
+
+# Autenticação JWT
+PyJWT==2.9.0
+
+# Requests para chamadas HTTP
+requests==2.31.0
+
+# Pillow para manipulação de imagens
+Pillow==12.0.0
+
+# python-magic para detecção de tipo MIME
+python-magic==0.4.27
+
+# Whitenoise para servir arquivos estáticos
+whitenoise==6.11.0
+
+# Documentação da API
+drf-spectacular==0.28.0

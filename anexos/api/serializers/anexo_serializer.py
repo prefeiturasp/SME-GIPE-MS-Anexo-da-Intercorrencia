@@ -217,7 +217,7 @@ class AnexoListSerializer(serializers.ModelSerializer):
         fields = (
             'uuid', 'nome_original', 'categoria', 'categoria_display',
             'perfil', 'perfil_display', 'tamanho_formatado', 'extensao',
-            'arquivo_url', 'criado_em', 'usuario_username'
+            'arquivo_url', 'criado_em', 'usuario_username', "usuario_nome"
         )
     
     @extend_schema_field(OpenApiTypes.STR)

@@ -775,3 +775,82 @@ class TestAnexoViewSetExtraCoverage:
         
         # Verificar que logger foi chamado
         assert mock_logger.error.called
+
+    def test_list_anexos_filtro_perfil_ue(
+        self,
+        authenticated_client,
+        anexo_factory,
+    ):
+        """Testa filtro por perfil UE (diretor + assistente)"""
+        # Arrange
+        anexo_factory.create_batch(2, perfil=Anexo.PERFIL_DIRETOR)
+        anexo_factory.create_batch(3, perfil=Anexo.PERFIL_ASSISTENTE)
+        anexo_factory.create_batch(1, perfil=Anexo.PERFIL_DRE)  # Não deve entrar
+
+        url = reverse('anexo-list')
+
+        # Act
+        response = authenticated_client.get(url, {'perfil': 'UE'})
+
+        # Assert
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['count'] == 5
+
+        perfis = {item['perfil'] for item in response.data['results']}
+        assert Anexo.PERFIL_DIRETOR in perfis
+        assert Anexo.PERFIL_ASSISTENTE in perfis
+        assert Anexo.PERFIL_DRE not in perfis
+
+    def test_list_anexos_filtro_perfil_ue_sem_resultados(
+        self,
+        authenticated_client,
+        anexo_factory,
+    ):
+        """Testa filtro UE quando não há diretor nem assistente"""
+        # Arrange
+        anexo_factory.create_batch(2, perfil=Anexo.PERFIL_DRE)
+
+        url = reverse('anexo-list')
+
+        # Act
+        response = authenticated_client.get(url, {'perfil': 'UE'})
+
+        # Assert
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['count'] == 0
+        assert response.data['results'] == []
+
+    def test_list_anexos_filtro_ue_com_categoria(
+        self,
+        authenticated_client,
+        anexo_factory,
+    ):
+        """Testa filtro UE combinado com categoria"""
+        # Arrange
+        anexo_factory.create(
+            perfil=Anexo.PERFIL_DIRETOR,
+            categoria='boletim_ocorrencia',
+        )
+        anexo_factory.create(
+            perfil=Anexo.PERFIL_ASSISTENTE,
+            categoria='registro_ocorrencia_interno',
+        )
+        anexo_factory.create(
+            perfil=Anexo.PERFIL_ASSISTENTE,
+            categoria='boletim_ocorrencia',
+        )
+
+        url = reverse('anexo-list')
+
+        # Act
+        response = authenticated_client.get(
+            url,
+            {'perfil': 'UE', 'categoria': 'boletim_ocorrencia'}
+        )
+
+        # Assert
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['count'] == 2
+
+        categorias = {item['categoria'] for item in response.data['results']}
+        assert categorias == {'boletim_ocorrencia'}

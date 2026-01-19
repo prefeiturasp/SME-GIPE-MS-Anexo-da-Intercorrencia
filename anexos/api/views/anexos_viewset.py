@@ -60,9 +60,16 @@ class AnexoViewSet(viewsets.ModelViewSet):
                 name='perfil',
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
-                description='Filtrar por perfil (diretor, assistente, dre, gipe)',
                 required=False,
-                enum=['diretor', 'assistente', 'dre', 'gipe']
+                enum=['diretor', 'assistente', 'dre', 'gipe', 'UE'],
+                description=(
+                    'Filtrar por perfil\n'
+                    '- diretor\n'
+                    '- assistente\n'
+                    '- dre\n'
+                    '- gipe\n'
+                    '- UE (diretor + assistente)'
+                ),
             ),
             OpenApiParameter(
                 name='categoria',
@@ -91,8 +98,11 @@ class AnexoViewSet(viewsets.ModelViewSet):
             qs = qs.filter(intercorrencia_uuid=intercorrencia_uuid)
         
         if perfil:
-            qs = qs.filter(perfil=perfil)
-        
+            if perfil.upper() == 'UE':
+                qs = qs.filter(perfil__in=['diretor', 'assistente'])
+            else:
+                qs = qs.filter(perfil=perfil)
+
         if categoria:
             qs = qs.filter(categoria=categoria)
         

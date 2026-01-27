@@ -1,11 +1,13 @@
+import uuid
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.db import transaction
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404
-from django.http import HttpResponseRedirect, StreamingHttpResponse, FileResponse
+from django.http import StreamingHttpResponse
 import requests
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
@@ -17,6 +19,8 @@ from anexos.api.serializers.anexo_serializer import (
     AnexoListSerializer,
     CategoriasDisponiveisSerializer,
 )
+
+from anexos.permissions import IsInternalServiceRequest
 
 import logging
 
@@ -357,13 +361,11 @@ class AnexoViewSet(viewsets.ModelViewSet):
         """
         anexo = self.get_object()
         
-        # Log da exclusão
         logger.info(
             f"Iniciando exclusão do anexo {anexo.uuid} "
             f"({anexo.nome_original}) por usuário {request.user.username}"
         )
         
-        # Armazenar informações antes de deletar
         arquivo_path = anexo.arquivo.name if anexo.arquivo else None
         anexo_uuid = anexo.uuid
         nome_arquivo = anexo.nome_original
@@ -382,7 +384,6 @@ class AnexoViewSet(viewsets.ModelViewSet):
                         f"Erro ao excluir arquivo físico {arquivo_path} do MinIO "
                         f"para anexo {anexo_uuid}: {str(e)}"
                     )
-                    # Continua com a exclusão do registro mesmo se falhar a exclusão do arquivo
             
             # Excluir registro do banco de dados
             anexo.delete()
@@ -433,7 +434,6 @@ class AnexoViewSet(viewsets.ModelViewSet):
             intercorrencia_uuid=intercorrencia_uuid
         )
         
-        # Ordenar por perfil e categoria
         anexos = anexos.order_by('perfil', 'categoria', '-criado_em')
         
         serializer = AnexoListSerializer(
@@ -529,7 +529,6 @@ class AnexoViewSet(viewsets.ModelViewSet):
             },
             400: OpenApiTypes.OBJECT
         },
-        tags=['Anexos']
     )
     @action(detail=False, methods=['get'], url_path='categorias-disponiveis')
     def categorias_disponiveis(self, request):
@@ -635,13 +634,12 @@ class AnexoViewSet(viewsets.ModelViewSet):
             },
             400: OpenApiTypes.OBJECT
         },
-        tags=['Anexos']
     )
     @action(
         detail=False, 
         methods=['post'], 
         url_path='validar-limite',
-        parser_classes=[JSONParser]  # Aceita apenas JSON neste endpoint
+        parser_classes=[JSONParser] 
     )
     def validar_limite(self, request):
         """
@@ -699,7 +697,6 @@ class AnexoViewSet(viewsets.ModelViewSet):
         """
         anexo = self.get_object()
         
-        # Verificar se o arquivo existe
         if not anexo.arquivo:
             return Response(
                 {'detail': 'Anexo não possui arquivo associado.'},
@@ -771,7 +768,6 @@ class AnexoViewSet(viewsets.ModelViewSet):
         """
         anexo = self.get_object()
         
-        # Verificar se o arquivo existe
         if not anexo.arquivo:
             return Response(
                 {'detail': 'Anexo não possui arquivo associado.'},
@@ -841,7 +837,6 @@ class AnexoViewSet(viewsets.ModelViewSet):
         
         for anexo in anexos:
             try:
-                # Verificar se o anexo possui arquivo
                 if not anexo.arquivo:
                     erros.append({
                         'uuid': str(anexo.uuid),
@@ -897,3 +892,229 @@ class AnexoViewSet(viewsets.ModelViewSet):
             response_data['count_erros'] = len(erros)
         
         return Response(response_data)
+    
+    
+    @extend_schema(
+        summary="Deletar todos os anexos de uma intercorrência",
+        description="""
+        Deleta todos os anexos de uma intercorrência específica (banco de dados + arquivos físicos do MinIO).
+        
+        **IMPORTANTE:**
+        - Este endpoint é de uso INTERNO entre microserviços
+        - Requer autenticação via token interno no header `X-Internal-Service-Token`
+        - A operação é atômica: se houver erro, todas as alterações são revertidas (rollback)
+        - Para no primeiro erro encontrado
+        
+        **Processo de deleção:**
+        1. Valida o UUID da intercorrência
+        2. Busca todos os anexos ativos da intercorrência
+        3. Para cada anexo:
+           - Remove o arquivo físico do MinIO
+           - Remove o registro do banco de dados
+        4. Se ocorrer erro em qualquer etapa, reverte TODAS as alterações
+        
+        **Cenários de resposta:**
+        - 200: Todos os anexos foram deletados com sucesso
+        - 200: Nenhum anexo encontrado para a intercorrência
+        - 400: UUID inválido ou não informado
+        - 401: Token de autenticação ausente ou inválido
+        - 500: Erro ao deletar anexos (rollback aplicado)
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='X-Internal-Service-Token',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.HEADER,
+                required=True,
+                description='Token de autenticação para requisições entre microserviços. Deve ser configurado no .env como INTERNAL_SERVICE_TOKEN.',
+            ),
+        ],
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'intercorrencia_uuid': {
+                        'type': 'string',
+                        'format': 'uuid',
+                        'description': 'UUID da intercorrência cujos anexos serão deletados',
+                        'example': '550e8400-e29b-41d4-a716-446655440000'
+                    }
+                },
+                'required': ['intercorrencia_uuid']
+            }
+        },
+        responses={
+            200: {
+                'type': 'object',
+                'properties': {
+                    'detail': {
+                        'type': 'string',
+                        'example': '3 anexo(s) deletado(s) com sucesso.'
+                    },
+                    'intercorrencia_uuid': {
+                        'type': 'string',
+                        'format': 'uuid'
+                    },
+                    'total_anexos': {
+                        'type': 'integer',
+                        'description': 'Total de anexos deletados'
+                    },
+                    'detalhes': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'uuid': {'type': 'string'},
+                                'nome_arquivo': {'type': 'string'},
+                                'status': {'type': 'string', 'example': 'sucesso'}
+                            }
+                        }
+                    }
+                },
+                'example': {
+                    'detail': '3 anexo(s) deletado(s) com sucesso.',
+                    'intercorrencia_uuid': '550e8400-e29b-41d4-a716-446655440000',
+                    'total_anexos': 3,
+                    'detalhes': [
+                        {'uuid': '...', 'nome_arquivo': 'foto1.jpg', 'status': 'sucesso'},
+                        {'uuid': '...', 'nome_arquivo': 'foto2.jpg', 'status': 'sucesso'},
+                        {'uuid': '...', 'nome_arquivo': 'doc1.pdf', 'status': 'sucesso'}
+                    ]
+                }
+            },
+            400: OpenApiTypes.OBJECT,
+            401: {
+                'type': 'object',
+                'properties': {
+                    'detail': {
+                        'type': 'string',
+                        'example': 'As credenciais de autenticação não foram fornecidas.'
+                    }
+                }
+            },
+            404: OpenApiTypes.OBJECT,
+            500: OpenApiTypes.OBJECT
+        },
+        tags=['Anexos - Interno']
+    )
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='deletar-por-intercorrencia',
+        permission_classes=[IsInternalServiceRequest],
+        parser_classes=[JSONParser]
+    )
+    def deletar_por_intercorrencia(self, request):
+        """
+        POST /api-anexos/v1/anexos/deletar-por-intercorrencia/
+        
+        Deleta todos os anexos de uma intercorrência (banco + MinIO).
+        Operação atômica: para no primeiro erro e faz rollback.
+        """
+        intercorrencia_uuid = request.data.get('intercorrencia_uuid')
+        
+        if not intercorrencia_uuid:
+            return Response(
+                {'detail': 'intercorrencia_uuid é obrigatório.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            uuid.UUID(str(intercorrencia_uuid))
+        except (ValueError, TypeError, AttributeError):
+            return Response(
+                {'detail': 'UUID informado é inválido.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        anexos = Anexo.objects.filter(
+            intercorrencia_uuid=intercorrencia_uuid,
+            ativo=True
+        )
+        
+        total_anexos = anexos.count()
+        
+        if total_anexos == 0:
+            logger.info(
+                f"Nenhum anexo encontrado para a intercorrência {intercorrencia_uuid}"
+            )
+            return Response(
+                {
+                    'detail': 'Nenhum anexo encontrado para esta intercorrência.',
+                    'intercorrencia_uuid': str(intercorrencia_uuid),
+                    'total_anexos': 0,
+                    'detalhes': []
+                },
+                status=status.HTTP_200_OK
+            )
+        
+        logger.info(
+            f"Iniciando exclusão de {total_anexos} anexo(s) "
+            f"da intercorrência {intercorrencia_uuid}"
+        )
+        
+        detalhes = []
+        
+        try:
+            with transaction.atomic():
+                for anexo in anexos:
+                    anexo_uuid = str(anexo.uuid)
+                    nome_arquivo = anexo.nome_original
+                    arquivo_path = anexo.arquivo.name if anexo.arquivo else None
+                    
+                    # Deletar arquivo físico do MinIO se existir
+                    if arquivo_path:
+                        try:
+                            anexo.arquivo.delete(save=False)
+                            logger.info(
+                                f"Arquivo físico {arquivo_path} excluído do MinIO "
+                                f"para anexo {anexo_uuid}"
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Erro ao excluir arquivo físico {arquivo_path} do MinIO: {str(e)}"
+                            )
+                            raise IOError(
+                                f"Falha ao excluir arquivo físico {arquivo_path} do MinIO"
+                            ) from e
+                    
+                    anexo.delete()
+                    
+                    detalhes.append({
+                        'uuid': anexo_uuid,
+                        'nome_arquivo': nome_arquivo,
+                        'status': 'sucesso'
+                    })
+                    
+                    logger.info(f"Anexo {anexo_uuid} ({nome_arquivo}) deletado com sucesso")
+            
+            logger.info(
+                f"Exclusão de {total_anexos} anexo(s) da intercorrência "
+                f"{intercorrencia_uuid} concluída com sucesso"
+            )
+            
+            return Response(
+                {
+                    'detail': f'{total_anexos} anexo(s) deletado(s) com sucesso.',
+                    'intercorrencia_uuid': str(intercorrencia_uuid),
+                    'total_anexos': total_anexos,
+                    'detalhes': detalhes
+                },
+                status=status.HTTP_200_OK
+            )
+            
+        except Exception as e:
+            logger.error(
+                f"Erro ao deletar anexos da intercorrência {intercorrencia_uuid}: {str(e)}. "
+                f"Rollback aplicado."
+            )
+            return Response(
+                {
+                    'detail': (
+                        f'Erro ao deletar anexos: {str(e)}. '
+                        f'Nenhuma alteração foi realizada (rollback aplicado).'
+                    ),
+                    'intercorrencia_uuid': str(intercorrencia_uuid)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

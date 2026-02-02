@@ -30,6 +30,11 @@ if READ_DOT_ENV_FILE:
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 
+INTERNAL_SERVICE_TOKEN = env(
+    'INTERNAL_SERVICE_TOKEN',
+    default='change-me-in-production-use-strong-token'
+)
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=False)
 

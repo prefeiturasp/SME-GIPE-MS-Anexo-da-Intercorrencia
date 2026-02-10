@@ -31,10 +31,6 @@ def user():
         password='testpass123',
         email='test@example.com'
     )
-    # Adicionar campo 'name' se existir no modelo
-    if hasattr(user, 'name'):
-        user.name = 'Test User'
-        user.save()
     return user
 
 
@@ -854,3 +850,161 @@ class TestAnexoViewSetExtraCoverage:
 
         categorias = {item['categoria'] for item in response.data['results']}
         assert categorias == {'boletim_ocorrencia'}
+
+
+@pytest.mark.django_db
+class TestAnexoViewSetDeletarPorIntercorrencia:
+    """Testes para action deletar_por_intercorrencia (POST /anexos/deletar-por-intercorrencia/)"""
+
+    def _auth_headers(self, token):
+        return {"HTTP_X_INTERNAL_SERVICE_TOKEN": token}
+
+    def test_deletar_por_intercorrencia_sem_header(
+        self, api_client, settings
+    ):
+        """Testa que sem token interno retorna 403"""
+        settings.INTERNAL_SERVICE_TOKEN = "segredo"
+        url = reverse('anexo-deletar-por-intercorrencia')
+
+        response = api_client.post(url, {}, format='json')
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_deletar_por_intercorrencia_sem_uuid(
+        self, api_client, settings
+    ):
+        """Testa validação de payload obrigatório"""
+        settings.INTERNAL_SERVICE_TOKEN = "segredo"
+        url = reverse('anexo-deletar-por-intercorrencia')
+
+        response = api_client.post(url, {}, format='json', **self._auth_headers("segredo"))
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'intercorrencia_uuid' in response.data['detail']
+
+    def test_deletar_por_intercorrencia_uuid_invalido(
+        self, api_client, settings
+    ):
+        """Testa validação de UUID inválido"""
+        settings.INTERNAL_SERVICE_TOKEN = "segredo"
+        url = reverse('anexo-deletar-por-intercorrencia')
+
+        response = api_client.post(
+            url,
+            {'intercorrencia_uuid': 'nao-e-uuid'},
+            format='json',
+            **self._auth_headers("segredo")
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'inválido' in response.data['detail'].lower()
+
+    def test_deletar_por_intercorrencia_sem_anexos(
+        self, api_client, settings
+    ):
+        """Testa resposta quando não há anexos"""
+        settings.INTERNAL_SERVICE_TOKEN = "segredo"
+        intercorrencia_uuid = uuid.uuid4()
+        url = reverse('anexo-deletar-por-intercorrencia')
+
+        response = api_client.post(
+            url,
+            {'intercorrencia_uuid': str(intercorrencia_uuid)},
+            format='json',
+            **self._auth_headers("segredo")
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['total_anexos'] == 0
+        assert response.data['detalhes'] == []
+
+    def test_deletar_por_intercorrencia_sucesso(
+        self, api_client, settings, anexo_pdf_factory
+    ):
+        """Testa exclusão de anexos com sucesso"""
+        settings.INTERNAL_SERVICE_TOKEN = "segredo"
+        intercorrencia_uuid = uuid.uuid4()
+        anexos = anexo_pdf_factory.create_batch(
+            2, intercorrencia_uuid=intercorrencia_uuid
+        )
+        url = reverse('anexo-deletar-por-intercorrencia')
+
+        response = api_client.post(
+            url,
+            {'intercorrencia_uuid': str(intercorrencia_uuid)},
+            format='json',
+            **self._auth_headers("segredo")
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['total_anexos'] == 2
+        assert len(response.data['detalhes']) == 2
+        for anexo in anexos:
+            assert not Anexo.objects.filter(uuid=anexo.uuid).exists()
+
+    def test_deletar_por_intercorrencia_rollback_em_erro(
+        self, api_client, settings, anexo_pdf_factory
+    ):
+        """Testa rollback quando ocorre erro durante a exclusão"""
+        settings.INTERNAL_SERVICE_TOKEN = "segredo"
+        intercorrencia_uuid = uuid.uuid4()
+        anexos = anexo_pdf_factory.create_batch(
+            2, intercorrencia_uuid=intercorrencia_uuid
+        )
+        url = reverse('anexo-deletar-por-intercorrencia')
+
+        original_delete = Anexo.delete
+        calls = {"n": 0}
+
+        def failing_delete(self, *args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise RuntimeError("Falha ao deletar anexo")
+            return original_delete(self, *args, **kwargs)
+
+        with patch.object(Anexo, 'delete', failing_delete):
+            response = api_client.post(
+                url,
+                {'intercorrencia_uuid': str(intercorrencia_uuid)},
+                format='json',
+                **self._auth_headers("segredo")
+            )
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        for anexo in anexos:
+            assert Anexo.objects.filter(uuid=anexo.uuid).exists()
+
+    def test_deletar_por_intercorrencia_erro_ao_excluir_arquivo_minio(
+        self, api_client, settings, anexo_pdf_factory
+    ):
+        """Testa erro ao excluir arquivo físico do MinIO (IOError)"""
+        settings.INTERNAL_SERVICE_TOKEN = "segredo"
+        intercorrencia_uuid = uuid.uuid4()
+        anexos = anexo_pdf_factory.create_batch(
+            2, intercorrencia_uuid=intercorrencia_uuid
+        )
+        url = reverse('anexo-deletar-por-intercorrencia')
+
+        calls = {"n": 0}
+
+        def failing_delete(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise IOError("MinIO error")
+            return None
+
+        with patch(
+            'django.db.models.fields.files.FieldFile.delete',
+            side_effect=failing_delete
+        ):
+            response = api_client.post(
+                url,
+                {'intercorrencia_uuid': str(intercorrencia_uuid)},
+                format='json',
+                **self._auth_headers("segredo")
+            )
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert 'Falha ao excluir arquivo físico' in response.data['detail']
+        for anexo in anexos:
+            assert Anexo.objects.filter(uuid=anexo.uuid).exists()

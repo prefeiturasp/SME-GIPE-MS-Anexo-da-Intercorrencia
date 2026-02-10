@@ -7,6 +7,8 @@ from anexos.api.serializers.anexo_serializer import (
     AnexoListSerializer,
     CategoriasDisponiveisSerializer,
 )
+from anexos.services import intercorrencia_service
+from anexos.services.intercorrencia_service import ExternalServiceError
 from anexos.tests.factories import (
     AnexoFactory,
     AnexoPDFFactory,
@@ -490,3 +492,64 @@ class TestAnexoSerializerValidacoes:
         serializer = AnexoSerializer(data=data)
         # Deve ser válido (limite é 10MB, não maior que 10MB)
         assert serializer.is_valid(), serializer.errors
+
+    def test_validacao_intercorrencia_com_token_chama_servico(
+        self, arquivo_pdf_mock, monkeypatch
+    ):
+        """Testa validação de intercorrência quando há token"""
+        factory = APIRequestFactory()
+        request = factory.post('/', HTTP_AUTHORIZATION='Bearer token-123')
+        uuid_intercorrencia = '123e4567-e89b-12d3-a456-426614174000'
+        called = {}
+
+        def fake_get_detalhes(intercorrencia_uuid, token):
+            called["uuid"] = str(intercorrencia_uuid)
+            called["token"] = token
+            return {"uuid": str(intercorrencia_uuid)}
+
+        monkeypatch.setattr(
+            intercorrencia_service,
+            'get_detalhes_intercorrencia',
+            fake_get_detalhes
+        )
+
+        data = {
+            'intercorrencia_uuid': uuid_intercorrencia,
+            'perfil': Anexo.PERFIL_DIRETOR,
+            'categoria': 'boletim_ocorrencia',
+            'arquivo': arquivo_pdf_mock,
+        }
+
+        serializer = AnexoSerializer(data=data, context={'request': request})
+        assert serializer.is_valid(), serializer.errors
+        assert called["uuid"] == uuid_intercorrencia
+        assert called["token"] == 'token-123'
+
+    def test_validacao_intercorrencia_com_token_erro_servico(
+        self, arquivo_pdf_mock, monkeypatch
+    ):
+        """Testa erro do serviço externo ao validar intercorrência"""
+        factory = APIRequestFactory()
+        request = factory.post('/', HTTP_AUTHORIZATION='Bearer token-err')
+        uuid_intercorrencia = '123e4567-e89b-12d3-a456-426614174001'
+
+        def fake_get_detalhes(*args, **kwargs):
+            raise ExternalServiceError("Falha no serviço externo")
+
+        monkeypatch.setattr(
+            intercorrencia_service,
+            'get_detalhes_intercorrencia',
+            fake_get_detalhes
+        )
+
+        data = {
+            'intercorrencia_uuid': uuid_intercorrencia,
+            'perfil': Anexo.PERFIL_DIRETOR,
+            'categoria': 'boletim_ocorrencia',
+            'arquivo': arquivo_pdf_mock,
+        }
+
+        serializer = AnexoSerializer(data=data, context={'request': request})
+        assert not serializer.is_valid()
+        assert 'detail' in serializer.errors
+        assert 'falha no serviço externo' in str(serializer.errors['detail']).lower()

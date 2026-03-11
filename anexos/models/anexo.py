@@ -27,9 +27,9 @@ class Anexo(ModeloBase):
     # Categorias por perfil
     CATEGORIA_DIRETOR_CHOICES = [
         ("boletim_ocorrencia", "Boletim de ocorrência"),
+        ("protocolo_boletim_ocorrencia", "Protocolo do boletim de ocorrência"),
         ("registro_ocorrencia_interno", "Registro de ocorrência interno"),
-        ("protocolo_conselho_tutelar", "Protocolo do Conselho Tutelar"),
-        ("instrucao_normativa_20_2020", "Instrução normativa 20/2020"),
+        ("imagens", "Imagens"),
     ]
 
     CATEGORIA_DRE_CHOICES = [

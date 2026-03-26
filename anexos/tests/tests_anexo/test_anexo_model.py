@@ -60,7 +60,7 @@ class TestAnexoModel:
         data = {
             'intercorrencia_uuid': '123e4567-e89b-12d3-a456-426614174000',
             'perfil': Anexo.PERFIL_DRE,
-            'categoria': "relatorio_naapa",
+            'categoria': "boletim_ocorrencia",
             'arquivo': arquivo_imagem_mock,
         }
         
@@ -93,7 +93,7 @@ class TestAnexoModel:
         # Perfil Diretor
         categorias_diretor = Anexo.get_categorias_validas_por_perfil(Anexo.PERFIL_DIRETOR)
         assert len(categorias_diretor) == 4
-        assert ('boletim_ocorrencia', 'Boletim de ocorrência') in categorias_diretor
+        assert ('boletim_ocorrencia', 'Boletim de ocorrência (B.O)') in categorias_diretor
         
         # Perfil Assistente (mesmas categorias do Diretor)
         categorias_assistente = Anexo.get_categorias_validas_por_perfil(Anexo.PERFIL_ASSISTENTE)
@@ -101,12 +101,12 @@ class TestAnexoModel:
         
         # Perfil DRE
         categorias_dre = Anexo.get_categorias_validas_por_perfil(Anexo.PERFIL_DRE)
-        assert len(categorias_dre) == 5
-        assert ('relatorio_naapa', 'Relatório do NAAPA') in categorias_dre
+        assert len(categorias_dre) == 2
+        assert ('boletim_ocorrencia', 'Boletim de ocorrência (B.O)') in categorias_dre
         
         # Perfil GIPE
         categorias_gipe = Anexo.get_categorias_validas_por_perfil(Anexo.PERFIL_GIPE)
-        assert len(categorias_gipe) == 10  # GIPE tem todas as categorias
+        assert len(categorias_gipe) == 2
     
     def test_tamanho_formatado(self):
         """Testa a propriedade tamanho_formatado"""
@@ -148,14 +148,14 @@ class TestAnexoModel:
     
     def test_anexo_perfil_dre(self):
         """Testa criação de anexo com perfil DRE usando factory"""
-        anexo = AnexoDREFactory(categoria="relatorio_cefai")
+        anexo = AnexoDREFactory(categoria="boletim_ocorrencia")
         
         assert anexo.perfil == Anexo.PERFIL_DRE
         assert anexo.categoria in [cat[0] for cat in Anexo.CATEGORIA_DRE_CHOICES]
     
     def test_anexo_perfil_gipe(self):
         """Testa criação de anexo com perfil GIPE usando factory"""
-        anexo = AnexoGIPEFactory(categoria="relatorio_supervisao_escolar")
+        anexo = AnexoGIPEFactory(categoria="oficio")
         
         assert anexo.perfil == Anexo.PERFIL_GIPE
         assert anexo.categoria in [cat[0] for cat in Anexo.CATEGORIA_GIPE_CHOICES]
@@ -280,7 +280,7 @@ class TestAnexoModel:
         # Verifica que contém o display da categoria
         assert "Boletim de ocorrência" in str_anexo
         # Verifica o formato esperado
-        assert str_anexo == "documento_teste.pdf - Boletim de ocorrência"
+        assert str_anexo == "documento_teste.pdf - Boletim de ocorrência (B.O)"
     
     def test_save_preenche_tipo_mime_de_content_type(self):
         """Testa que o método save preenche tipo_mime a partir de arquivo.content_type quando disponível"""

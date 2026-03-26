@@ -24,33 +24,23 @@ class Anexo(ModeloBase):
         (PERFIL_GIPE, "GIPE"),
     ]
 
+    BOLETIM_OCORRENCIA = "Boletim de ocorrência (B.O)"
     # Categorias por perfil
     CATEGORIA_DIRETOR_CHOICES = [
-        ("boletim_ocorrencia", "Boletim de ocorrência"),
+        ("boletim_ocorrencia", BOLETIM_OCORRENCIA),
         ("protocolo_boletim_ocorrencia", "Protocolo do boletim de ocorrência"),
         ("registro_ocorrencia_interno", "Registro de ocorrência interno"),
         ("imagens", "Imagens"),
     ]
 
     CATEGORIA_DRE_CHOICES = [
-        ("relatorio_naapa", "Relatório do NAAPA"),
-        ("relatorio_cefai", "Relatório do CEFAI"),
-        ("relatorio_sts", "Relatório do STS"),
-        ("relatorio_cpca", "Relatório do CPCA"),
-        ("oficio_gcm", "Ofício Guarda Civil Metropolitana (GCM)"),
+        ("boletim_ocorrencia", BOLETIM_OCORRENCIA),
+        ("oficio", "Ofício"),
     ]
 
     CATEGORIA_GIPE_CHOICES = [
-        ("boletim_ocorrencia", "Boletim de ocorrência"),
-        ("registro_intercorrencia", "Registro de intercorrência"),
-        ("protocolo_conselho_tutelar", "Protocolo Conselho Tutelar"),
-        ("instrucao_normativa_20_2020", "Instrução Normativa 20/2020"),
-        ("relatorio_naapa", "Relatório do NAAPA"),
-        ("relatorio_supervisao_escolar", "Relatório da Supervisão Escolar"),
-        ("relatorio_cefai", "Relatório do CEFAI"),
-        ("relatorio_sts", "Relatório do STS"),
-        ("relatorio_cpca", "Relatório do CPCA"),
-        ("oficio_gcm", "Ofício Guarda Civil Metropolitana (GCM)"),
+        ("boletim_ocorrencia", BOLETIM_OCORRENCIA),
+        ("oficio", "Ofício"),
     ]
 
     # Todas as categorias combinadas

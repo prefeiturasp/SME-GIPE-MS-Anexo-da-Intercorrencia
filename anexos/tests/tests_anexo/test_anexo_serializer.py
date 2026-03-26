@@ -115,7 +115,7 @@ class TestAnexoSerializer:
         data = {
             'intercorrencia_uuid': '123e4567-e89b-12d3-a456-426614174000',
             'perfil': Anexo.PERFIL_DIRETOR,
-            'categoria': 'relatorio_naapa',  # Categoria de DRE
+            'categoria': 'oficio',  # Categoria de DRE
             'arquivo': arquivo_pdf_mock,
         }
         
@@ -266,10 +266,10 @@ class TestAnexoSerializer:
             (Anexo.PERFIL_DIRETOR, 'boletim_ocorrencia', '123e4567-e89b-12d3-a456-426614174001'),
             (Anexo.PERFIL_DIRETOR, 'registro_ocorrencia_interno', '123e4567-e89b-12d3-a456-426614174002'),
             (Anexo.PERFIL_ASSISTENTE, 'boletim_ocorrencia', '123e4567-e89b-12d3-a456-426614174003'),
-            (Anexo.PERFIL_DRE, 'relatorio_naapa', '123e4567-e89b-12d3-a456-426614174004'),
-            (Anexo.PERFIL_DRE, 'relatorio_cefai', '123e4567-e89b-12d3-a456-426614174005'),
+            (Anexo.PERFIL_DRE, 'boletim_ocorrencia', '123e4567-e89b-12d3-a456-426614174004'),
+            (Anexo.PERFIL_DRE, 'oficio', '123e4567-e89b-12d3-a456-426614174005'),
             (Anexo.PERFIL_GIPE, 'boletim_ocorrencia', '123e4567-e89b-12d3-a456-426614174006'),
-            (Anexo.PERFIL_GIPE, 'relatorio_supervisao_escolar', '123e4567-e89b-12d3-a456-426614174007'),
+            (Anexo.PERFIL_GIPE, 'oficio', '123e4567-e89b-12d3-a456-426614174007'),
         ]
         
         for perfil, categoria, uuid_intercorrencia in combinacoes_validas:
@@ -363,7 +363,7 @@ class TestCategoriasDisponiveisSerializer:
         data = serializer.data
         
         assert data['perfil'] == Anexo.PERFIL_DRE
-        assert len(data['categorias']) == 5
+        assert len(data['categorias']) == 2
     
     def test_serializacao_categorias_gipe(self):
         """Testa serialização de categorias para perfil GIPE"""
@@ -372,7 +372,7 @@ class TestCategoriasDisponiveisSerializer:
         data = serializer.data
         
         assert data['perfil'] == Anexo.PERFIL_GIPE
-        assert len(data['categorias']) == 10  # GIPE tem todas as categorias
+        assert len(data['categorias']) == 2
     
     def test_formato_categorias(self):
         """Testa o formato das categorias retornadas"""

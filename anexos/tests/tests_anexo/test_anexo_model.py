@@ -101,12 +101,12 @@ class TestAnexoModel:
         
         # Perfil DRE
         categorias_dre = Anexo.get_categorias_validas_por_perfil(Anexo.PERFIL_DRE)
-        assert len(categorias_dre) == 2
+        assert len(categorias_dre) == 3
         assert ('boletim_ocorrencia', 'Boletim de ocorrência (B.O)') in categorias_dre
         
         # Perfil GIPE
         categorias_gipe = Anexo.get_categorias_validas_por_perfil(Anexo.PERFIL_GIPE)
-        assert len(categorias_gipe) == 2
+        assert len(categorias_gipe) == 3
     
     def test_tamanho_formatado(self):
         """Testa a propriedade tamanho_formatado"""

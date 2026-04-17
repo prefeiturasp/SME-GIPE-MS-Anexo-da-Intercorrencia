@@ -363,7 +363,7 @@ class TestCategoriasDisponiveisSerializer:
         data = serializer.data
         
         assert data['perfil'] == Anexo.PERFIL_DRE
-        assert len(data['categorias']) == 2
+        assert len(data['categorias']) == 3
     
     def test_serializacao_categorias_gipe(self):
         """Testa serialização de categorias para perfil GIPE"""
@@ -372,7 +372,7 @@ class TestCategoriasDisponiveisSerializer:
         data = serializer.data
         
         assert data['perfil'] == Anexo.PERFIL_GIPE
-        assert len(data['categorias']) == 2
+        assert len(data['categorias']) == 3
     
     def test_formato_categorias(self):
         """Testa o formato das categorias retornadas"""

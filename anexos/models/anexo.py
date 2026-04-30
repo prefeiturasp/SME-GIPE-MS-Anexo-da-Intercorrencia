@@ -36,11 +36,13 @@ class Anexo(ModeloBase):
     CATEGORIA_DRE_CHOICES = [
         ("boletim_ocorrencia", BOLETIM_OCORRENCIA),
         ("oficio", "Ofício"),
+        ("outro_documento", "Outro documento"),
     ]
 
     CATEGORIA_GIPE_CHOICES = [
         ("boletim_ocorrencia", BOLETIM_OCORRENCIA),
         ("oficio", "Ofício"),
+        ("outro_documento", "Outro documento"),
     ]
 
     # Todas as categorias combinadas
